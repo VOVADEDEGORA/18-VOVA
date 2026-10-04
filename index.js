@@ -1,37 +1,37 @@
 const express = require('express');
 const app = express();
 
-// База ключей: ник -> ключ (замени на свою базу / БД)
-const KEYS = {
-  "YourNick": "KEY-1234-ABCD",
-  "AnotherNick": "KEY-5678-EFGH"
+app.use(express.json());
+
+// База данных ключей и привязанных ников
+const VALID_KEYS = {
+    "KEY-1234-ABCD": "User1",
+    "KEY-5678-EFGH": "ProPlayer",
+    "VIP-9999-XXXX": "Admin"
 };
 
-// 1) Проверка ключа
-app.get('/api/check', (req, res) => {
-  const nick = (req.query.nick || '').trim().toLowerCase();
-  const key  = (req.query.key  || '').trim();
+app.post('/verify', (req, res) => {
+    const { nickname, key } = req.body;
 
-  if (!nick || !key) return res.send('missing');
-  if (!Object.keys(KEYS).some(n => n.toLowerCase() === nick)) {
-    return res.send('key_not_registered'); // ключ не зарегистрирован на ник
-  }
-  if (KEYS[Object.keys(KEYS).find(n => n.toLowerCase() === nick)] !== key) {
-    return res.send('bad_key'); // не подходящий ключ
-  }
-  res.send('ok');
+    if (!nickname || !key) {
+        return res.status(400).json({ detail: "Заполните все поля" });
+    }
+
+    // 1. Проверка наличия ключа
+    if (!VALID_KEYS[key]) {
+        return res.status(400).json({ detail: "не подходящий ключ" });
+    }
+
+    // 2. Проверка привязки ключа к нику
+    if (VALID_KEYS[key].toLowerCase() !== nickname.toLowerCase()) {
+        return res.status(403).json({ detail: "ключ не зарегистрирован  на ник" });
+    }
+
+    return res.status(200).json({ status: "success", message: "Успешный вход" });
 });
 
-// 2) Раздача script.lua (файл лежит рядом с server.js)
-const fs = require('fs');
-const path = require('path');
-app.get('/script.lua', (req, res) => {
-  const file = path.join(__dirname, 'script.lua');
-  if (!fs.existsSync(file)) return res.status(404).send('script not found');
-  res.type('text/plain').send(fs.readFileSync(file, 'utf8'));
-});
-
-app.get('/', (req, res) => res.send('T00LB0X server is running'));
-
+// Railway автоматически назначает порт через process.env.PORT
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log('Server on ' + PORT));
+app.listen(PORT, () => {
+    console.log(`Сервер запущен на порту ${PORT}`);
+});
