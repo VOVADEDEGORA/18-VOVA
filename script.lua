@@ -1,16 +1,15 @@
 --[[
     ============================================================
     T00LB0XV2 [PREMIUM FULL EDITION]
-    Version: 5.8 (Spawner Fix • No Categories • Scroll Hidden • Flight)
+    Version: 7.4 (Bigger Menu • Cars Find Fix)
     ============================================================
-    ЧТО НОВОГО В V5.8:
-    - СПАВНЕР: кнопка СПАВНИТЬ всегда видна (фикс. высота панели)
-    - СПАВНЕР: категории убраны — показываются все предметы сразу
-    - СПАВНЕР: не сканирует папку «Объекты»/objects/obj
-    - ПОЛЁТ: кнопка «🔄 Обновить список» сверху, машины ищутся по
-      SteeringWheel/колёсам/имени, счётчик машин; клавиша K убрана
-    - ПРОКРУТКА: скроллбар полностью скрыт (прозрачный), появляется
-      только если реально нужно крутить
+    ЧТО НОВОГО В V7.4:
+    - ГЛАВНОЕ ОКНО УВЕЛИЧЕНО: 1150×740 (по умолчанию), ресайзер
+      теперь до 1800×1100
+    - ПОЛЁТ: поиск машин расширен — любая модель с деталями
+      wheel/tire/rim + SteeringWheel + имена car/truck/motor и т.д.
+    - СПАВНЕР МАШИНЫ: тот же расширенный поиск, переключение
+      ПРЕДМЕТЫ/МАШИНЫ работает
     ============================================================
 ]]
 
@@ -260,7 +259,7 @@ local AnimInfo = {
     Bounce = TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
 }
 
-local SCRIPT_VERSION = "V5.8"
+local SCRIPT_VERSION = "V7.4"
 
 -- ==========================================
 -- УТИЛИТЫ ДЛЯ СОЗДАНИЯ ИНТЕРФЕЙСА
@@ -306,28 +305,43 @@ local function AddStroke(parent, color, thickness)
     })
 end
 
--- Жёсткий ограничитель прокрутки: не даёт крутиться за конец контента
+-- Жёсткий ограничитель прокрутки: не даёт крутиться в пустоту.
+-- Когда контент помещается — прокрутка полностью отключается.
 local function ClampScroll(scr)
     pcall(function()
         local function updateScrollState()
-            local maxY = math.max(0, scr.AbsoluteCanvasSize.Y - scr.AbsoluteSize.Y)
-            local cy = math.clamp(scr.CanvasPosition.Y, 0, maxY)
-            if scr.CanvasPosition.Y ~= cy then
-                scr.CanvasPosition = Vector2.new(0, cy)
-            end
-            local contentFits = scr.AbsoluteCanvasSize.Y <= scr.AbsoluteSize.Y + 1
-            scr.ScrollingEnabled = (not contentFits)
-            scr.ScrollBarImageTransparency = 1
+            pcall(function()
+                local list = scr:FindFirstChildOfClass("UIListLayout") or scr:FindFirstChildOfClass("UIGridLayout")
+                local contentH = 0
+                if list and list.AbsoluteContentSize then
+                    contentH = list.AbsoluteContentSize.Y
+                else
+                    contentH = scr.AbsoluteCanvasSize.Y
+                end
+                local viewH = scr.AbsoluteSize.Y
+                local contentFits = contentH <= viewH + 1
+                if contentFits then
+                    scr.CanvasSize = UDim2.new(0, 0, 0, 0)
+                    scr.ScrollingEnabled = false
+                    scr.ScrollBarThickness = 0
+                else
+                    scr.CanvasSize = UDim2.new(0, 0, 0, contentH + 2)
+                    scr.ScrollingEnabled = true
+                    scr.ScrollBarThickness = 5
+                end
+                scr.CanvasPosition = Vector2.new(0, math.clamp(scr.CanvasPosition.Y, 0, math.max(0, contentH - viewH)))
+                scr.ScrollBarImageTransparency = 1
+            end)
         end
         scr:GetPropertyChangedSignal("CanvasPosition"):Connect(updateScrollState)
         scr:GetPropertyChangedSignal("AbsoluteCanvasSize"):Connect(updateScrollState)
         scr:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateScrollState)
-        task.spawn(function()
-            task.wait(0.1)
-            task.wait(0.5)
-            updateScrollState()
-        end)
-        updateScrollState()
+        if scr:FindFirstChildOfClass("UIListLayout") then
+            scr:FindFirstChildOfClass("UIListLayout"):GetPropertyChangedSignal("AbsoluteContentSize"):Connect(updateScrollState)
+        end
+        task.spawn(updateScrollState)
+        task.delay(0.5, updateScrollState)
+        task.delay(1.5, updateScrollState)
     end)
 end
 
@@ -663,8 +677,8 @@ for i = 0, 2 do
 end
 
 local MainFrame = Create("Frame", {
-    Size = UDim2.new(0, 960, 0, 640),
-    Position = UDim2.new(0.5, -480, 0.5, -320),
+Size = UDim2.new(0, 1150, 0, 740),
+    Position = UDim2.new(0.5, -575, 0.5, -370),
     BackgroundColor3 = Theme.Background,
     Active = true,
     BorderSizePixel = 0,
@@ -736,18 +750,6 @@ local Title = Create("TextLabel", {
     TextColor3 = Theme.Text,
     Font = Enum.Font.GothamBold,
     TextSize = 16,
-    TextXAlignment = Enum.TextXAlignment.Left,
-    Parent = Header
-})
-
-Create("TextLabel", {
-    Size = UDim2.new(1, -160, 0, 14),
-    Position = UDim2.new(0, 52, 0, 30),
-    BackgroundTransparency = 1,
-    Text = "PREMIUM FULL EDITION • " .. SCRIPT_VERSION,
-    TextColor3 = Theme.TextDim,
-    Font = Enum.Font.Gotham,
-    TextSize = 10,
     TextXAlignment = Enum.TextXAlignment.Left,
     Parent = Header
 })
@@ -977,7 +979,15 @@ SelectTab = function(index)
         Pages[i].Visible = active
         if active then
             task.spawn(function()
-                pcall(function() Pages[i].CanvasPosition = Vector2.new(0, 0) end)
+                task.wait(0.05)
+                pcall(function()
+                    Pages[i].CanvasPosition = Vector2.new(0, 0)
+                    local list = Pages[i]:FindFirstChildOfClass("UIListLayout")
+                    if list and list.AbsoluteContentSize.Y <= Pages[i].AbsoluteSize.Y then
+                        Pages[i].ScrollingEnabled = false
+                        Pages[i].CanvasSize = UDim2.new(0, 0, 0, 0)
+                    end
+                end)
             end)
         end
     end
@@ -1173,9 +1183,9 @@ Resizer.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserIn
 UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then isResizing = false end end)
 UserInputService.InputChanged:Connect(function(input)
     if isResizing and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local minW, minH = 960, 640
-        local w = math.clamp(input.Position.X - MainFrame.AbsolutePosition.X + 12, minW, 1600)
-        local h = math.clamp(input.Position.Y - MainFrame.AbsolutePosition.Y + 12, minH, 1000)
+local minW, minH = 960, 640
+        local w = math.clamp(input.Position.X - MainFrame.AbsolutePosition.X + 12, minW, 1800)
+        local h = math.clamp(input.Position.Y - MainFrame.AbsolutePosition.Y + 12, minH, 1100)
         MainFrame.Size = UDim2.new(0, w, 0, h)
     end
 end)
@@ -1426,8 +1436,6 @@ local selectedItem = nil
 local totalItemsCount = 0
 local itemButtonsList = {}
 local fluidRows = {}
-local spawnKeybind = Enum.KeyCode.F
-local isBindingKey = false
 
 local currentCategory = "All"
 
@@ -1440,6 +1448,33 @@ end
 
 -- ШАПКА
 Create("TextLabel", {Size = UDim2.new(0.98, 0, 0, 20), BackgroundTransparency = 1, Text = "T00LB0X SPAWNER", TextColor3 = Theme.Accent, Font = Enum.Font.GothamBold, TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left, Parent = PageSpawner})
+
+-- Вкладки: ПРЕДМЕТЫ / МАШИНЫ
+local spawnMode = "items"
+local SpawnTabBar = Create("Frame", {Size = UDim2.new(0.98, 0, 0, 34), BackgroundTransparency = 1, Parent = PageSpawner})
+local TabBtnItems = CreateButtonEx(SpawnTabBar, "📦 ПРЕДМЕТЫ", Theme.Accent, Theme.AccentHover, function()
+    spawnMode = "items"
+    syncSpawnTabs()
+    rebuildSpawnGrid()
+end)
+TabBtnItems.Size = UDim2.new(0.49, 0, 1, 0)
+TabBtnItems.Position = UDim2.new(0, 0, 0, 0)
+TabBtnItems.TextColor3 = Color3.new(1, 1, 1)
+local TabBtnCars = CreateButtonEx(SpawnTabBar, "🚗 МАШИНЫ", Theme.ElementBg, Theme.ElementHover, function()
+    spawnMode = "cars"
+    syncSpawnTabs()
+    rebuildSpawnGrid()
+end)
+TabBtnCars.Size = UDim2.new(0.49, 0, 1, 0)
+TabBtnCars.Position = UDim2.new(0.51, 0, 0, 0)
+
+local function syncSpawnTabs()
+    local onItems = (spawnMode == "items")
+    TabBtnItems.BackgroundColor3 = onItems and Theme.Accent or Theme.ElementBg
+    TabBtnItems.TextColor3 = onItems and Color3.new(1, 1, 1) or Theme.Text
+    TabBtnCars.BackgroundColor3 = (not onItems) and Theme.Accent or Theme.ElementBg
+    TabBtnCars.TextColor3 = (not onItems) and Color3.new(1, 1, 1) or Theme.Text
+end
 
 -- Поиск
 local SearchBoxContainer = Create("Frame", {Size = UDim2.new(0.98, 0, 0, 38), BackgroundColor3 = Theme.DeepBg, BorderSizePixel = 0, Parent = PageSpawner})
@@ -1470,20 +1505,21 @@ local RightPanel = Create("Frame", {Size = UDim2.new(0.4, 0, 1, 0), Position = U
 spawnCorner(RightPanel, 10)
 spawnStroke(RightPanel, Theme.Outline, 1)
 
-local SelectedItemName = Create("TextLabel", {Text = "Предмет не выбран", Size = UDim2.new(1, -20, 0, 30), Position = UDim2.new(0, 10, 0, 10), BackgroundTransparency = 1, TextColor3 = Theme.Gold, Font = Enum.Font.GothamBold, TextSize = 14, TextWrapped = true, Parent = RightPanel})
+local SelectedItemName = Create("TextLabel", {Text = "Предмет не выбран", Size = UDim2.new(1, -20, 0, 22), Position = UDim2.new(0, 10, 0, 8), BackgroundTransparency = 1, TextColor3 = Theme.Gold, Font = Enum.Font.GothamBold, TextSize = 13, TextScaled = true, TextXAlignment = Enum.TextXAlignment.Left, Parent = RightPanel})
 
-local AmmoLabel = Create("TextLabel", {Text = "Патроны:", Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 50), BackgroundTransparency = 1, TextColor3 = Theme.TextDim, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Visible = false, Parent = RightPanel})
-local AmmoInput = Create("TextBox", {PlaceholderText = "Количество / inf", Size = UDim2.new(1, -20, 0, 30), Position = UDim2.new(0, 10, 0, 70), BackgroundColor3 = Theme.DeepBg, TextColor3 = Theme.Text, PlaceholderColor3 = Theme.TextDim, Font = Enum.Font.Gotham, TextSize = 12, Visible = false, Parent = RightPanel})
+local AmmoLabel = Create("TextLabel", {Text = "Патроны:", Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 34), BackgroundTransparency = 1, TextColor3 = Theme.TextDim, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Visible = false, Parent = RightPanel})
+local AmmoInput = Create("TextBox", {PlaceholderText = "Количество / inf", Size = UDim2.new(1, -20, 0, 26), Position = UDim2.new(0, 10, 0, 52), BackgroundColor3 = Theme.DeepBg, TextColor3 = Theme.Text, PlaceholderColor3 = Theme.TextDim, Font = Enum.Font.Gotham, TextSize = 12, Visible = false, Parent = RightPanel})
 spawnCorner(AmmoInput, 6)
 spawnStroke(AmmoInput, Theme.Outline, 1)
 
-local FluidHeaderLabel = Create("TextLabel", {Text = "Жидкости / Газы:", Size = UDim2.new(0.6, 0, 0, 18), Position = UDim2.new(0, 10, 0, 110), BackgroundTransparency = 1, TextColor3 = Theme.TextDim, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = RightPanel})
-local AddFluidBtn = Create("TextButton", {Text = "+ Строка", Size = UDim2.new(0.35, 0, 0, 22), Position = UDim2.new(0.62, 0, 0, 108), BackgroundColor3 = Theme.Accent, TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 11, Parent = RightPanel})
+local FluidHeaderLabel = Create("TextLabel", {Text = "Жидкости / Газы:", Size = UDim2.new(0.6, 0, 0, 18), Position = UDim2.new(0, 10, 0, 88), BackgroundTransparency = 1, TextColor3 = Theme.TextDim, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = RightPanel})
+local AddFluidBtn = Create("TextButton", {Text = "+ Строка", Size = UDim2.new(0.35, 0, 0, 22), Position = UDim2.new(0.62, 0, 0, 86), BackgroundColor3 = Theme.Accent, TextColor3 = Color3.new(1, 1, 1), Font = Enum.Font.GothamBold, TextSize = 11, Parent = RightPanel})
 spawnCorner(AddFluidBtn, 4)
 
-local FluidsScroll = Create("ScrollingFrame", {Size = UDim2.new(1, -20, 0, 190), Position = UDim2.new(0, 10, 0, 135), BackgroundColor3 = Theme.Background, ScrollBarThickness = 0, ScrollBarImageTransparency = 1, AutomaticCanvasSize = Enum.AutomaticSize.Y, ElasticBehavior = Enum.ElasticBehavior.Never, Parent = RightPanel})
+local FluidsScroll = Create("ScrollingFrame", {Size = UDim2.new(1, -20, 0, 160), Position = UDim2.new(0, 10, 0, 112), BackgroundColor3 = Theme.Background, ScrollBarThickness = 0, ScrollBarImageTransparency = 1, AutomaticCanvasSize = Enum.AutomaticSize.Y, ElasticBehavior = Enum.ElasticBehavior.Never, Parent = RightPanel})
 spawnCorner(FluidsScroll, 6)
 local FluidsLayout = Create("UIListLayout", {Padding = UDim.new(0, 6), Parent = FluidsScroll})
+ClampScroll(FluidsScroll)
 
 local function addFluidRow(defaultName, defaultValue)
     local row = Create("Frame", {Size = UDim2.new(1, -6, 0, 30), BackgroundColor3 = Theme.DeepBg, Parent = FluidsScroll})
@@ -1507,16 +1543,19 @@ end
 addFluidRow("", "")
 AddFluidBtn.MouseButton1Click:Connect(function() addFluidRow("", "") end)
 
-Create("TextLabel", {Text = "Количество (1..100):", Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 335), BackgroundTransparency = 1, TextColor3 = Theme.TextDim, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = RightPanel})
-local AmountInput = Create("TextBox", {Text = "1", Size = UDim2.new(1, -20, 0, 32), Position = UDim2.new(0, 10, 0, 355), BackgroundColor3 = Theme.DeepBg, TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 14, Parent = RightPanel})
+Create("TextLabel", {Text = "Количество (1..100):", Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 268), BackgroundTransparency = 1, TextColor3 = Theme.TextDim, Font = Enum.Font.GothamMedium, TextSize = 12, TextXAlignment = Enum.TextXAlignment.Left, Parent = RightPanel})
+local AmountInput = Create("TextBox", {Text = "1", Size = UDim2.new(1, -20, 0, 32), Position = UDim2.new(0, 10, 0, 286), BackgroundColor3 = Theme.DeepBg, TextColor3 = Theme.Text, Font = Enum.Font.GothamBold, TextSize = 14, Parent = RightPanel})
 spawnCorner(AmountInput, 6)
 spawnStroke(AmountInput, Theme.Outline, 1)
 
-local KeybindBtn = Create("TextButton", {Text = "Клавиша спавна (1 шт.): [ F ]", Size = UDim2.new(1, -20, 0, 32), Position = UDim2.new(0, 10, 0, 395), BackgroundColor3 = Theme.ElementHover, TextColor3 = Theme.Text, Font = Enum.Font.GothamMedium, TextSize = 12, Parent = RightPanel})
+-- Горячая клавиша спавна (настраивается, только клавиатура)
+local spawnKeybind = Enum.KeyCode.F
+local isBindingKey = false
+local KeybindBtn = Create("TextButton", {Text = "Клавиша спавна: [ F ]", Size = UDim2.new(1, -20, 0, 32), Position = UDim2.new(0, 10, 0, 322), BackgroundColor3 = Theme.ElementHover, TextColor3 = Theme.Text, Font = Enum.Font.GothamMedium, TextSize = 12, Parent = RightPanel})
 spawnCorner(KeybindBtn, 6)
 KeybindBtn.MouseButton1Click:Connect(function()
     isBindingKey = true
-    KeybindBtn.Text = "Нажмите любую клавишу..."
+    KeybindBtn.Text = "Нажми любую клавишу... (не мышь)"
     KeybindBtn.BackgroundColor3 = Color3.fromRGB(100, 80, 30)
 end)
 
@@ -1529,13 +1568,17 @@ local function triggerSpawn(forceAmount)
     local remote = ReplicatedStorage:FindFirstChild("sandboxconnection") and ReplicatedStorage.sandboxconnection:FindFirstChild("spawnobject")
     if not remote then Notify("Remote spawnobject не найден", Theme.Red) return end
     local amount = forceAmount or math.clamp(tonumber(AmountInput.Text) or 1, 1, 100)
+    -- Только ОДНА жидкость (первая заполненная строка), чтобы не спавнились лишние
     local fluidTable = {}
     for _, r in ipairs(fluidRows) do
         local fn = r.NameBox.Text
         local fv = r.ValueBox.Text
-        if fn ~= "" or fv ~= "" then
+        if fn ~= "" and fv ~= "" then
             table.insert(fluidTable, {name = fn, value = fv})
         end
+    end
+    if #fluidTable > 1 then
+        fluidTable = {fluidTable[1]}
     end
     if #fluidTable == 0 then table.insert(fluidTable, {name = "", value = ""}) end
     local targetAmmo = ""
@@ -1558,20 +1601,21 @@ SpawnButton.MouseButton1Click:Connect(function() triggerSpawn() end)
 
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
     if isBindingKey then
+        -- Принимаем только клавиши клавиатуры, НЕ мышь
         if input.UserInputType == Enum.UserInputType.Keyboard then
             spawnKeybind = input.KeyCode
-            KeybindBtn.Text = "Клавиша спавна (1 шт.): [ " .. input.KeyCode.Name .. " ]"
+            KeybindBtn.Text = "Клавиша спавна: [ " .. input.KeyCode.Name .. " ]"
             KeybindBtn.BackgroundColor3 = Theme.ElementHover
             isBindingKey = false
         end
         return
     end
     if gameProcessed then return end
-    if input.KeyCode == Enum.KeyCode.RightShift then
+    if input.UserInputType == Enum.UserInputType.Keyboard and input.KeyCode == spawnKeybind then
+        triggerSpawn(1)
+    elseif input.KeyCode == Enum.KeyCode.RightShift then
         PageSpawner.Visible = not PageSpawner.Visible
         if PageSpawner.Visible then Notify("Спавнер виден", Theme.Green) else Notify("Спавнер скрыт", Theme.Red) end
-    elseif input.KeyCode == spawnKeybind then
-        triggerSpawn(1)
     end
 end)
 
@@ -1654,19 +1698,56 @@ local function createItemButton(item, category)
 end
 
 local scannedItems = {}
-for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
-    if isValidItem(obj) then
-        local parentName = obj.Parent and obj.Parent.Name:lower() or ""
-        local skipFolder = (parentName == "объекты" or parentName == "objects" or parentName == "object" or parentName == "obj")
-        if not obj.Parent:IsA("Model") and not skipFolder and not scannedItems[obj] then
-            scannedItems[obj] = true
-            local cat = getItemCategory(obj)
-            createItemButton(obj, cat)
+
+local function rebuildSpawnGrid()
+    -- Очистка сетки
+    for _, c in pairs(ItemsScroll:GetChildren()) do
+        if not c:IsA("UIGridLayout") then c:Destroy() end
+    end
+    itemButtonsList = {}
+    totalItemsCount = 0
+
+    if spawnMode == "cars" then
+        local seenCars = {}
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) and not seenCars[obj] then
+                seenCars[obj] = true
+                local n = obj.Name:lower()
+                local nameHit = n:match("car") or n:match("van") or n:match("bus") or n:match("buggy") or n:match("moped") or n:match("lada") or n:match("sedan") or n:match("maincar") or n:match("truck") or n:match("motor")
+                local hasSteering = obj:FindFirstChild("SteeringWheel", true) or obj:FindFirstChild("Steering", true)
+                local hasWheelPart = false
+                for _, part in ipairs(obj:GetDescendants()) do
+                    local pn = part.Name:lower()
+                    if part:IsA("BasePart") and (pn:match("wheel") or pn:match("tire") or pn:match("rim")) then
+                        hasWheelPart = true
+                        break
+                    end
+                end
+                if (nameHit or hasSteering or hasWheelPart) and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) then
+                    createItemButton(obj, "Cars")
+                end
+            end
+        end
+    else
+        local seen = {}
+        for _, obj in ipairs(ReplicatedStorage:GetDescendants()) do
+            if isValidItem(obj) and not seen[obj] then
+                seen[obj] = true
+                local parentName = obj.Parent and obj.Parent.Name:lower() or ""
+                local skipFolder = (parentName == "объекты" or parentName == "objects" or parentName == "object" or parentName == "obj")
+                if not obj.Parent:IsA("Model") and not skipFolder then
+                    local cat = getItemCategory(obj)
+                    createItemButton(obj, cat)
+                end
+            end
         end
     end
+
+    CountLabel.Text = "Найдено объектов: " .. tostring(totalItemsCount)
+    updateFilter()
 end
 
-CountLabel.Text = "Найдено объектов: " .. tostring(totalItemsCount)
+rebuildSpawnGrid()
 SearchBox:GetPropertyChangedSignal("Text"):Connect(updateFilter)
 
 -- ==========================================
@@ -1932,7 +2013,7 @@ local function OpenFlightWindow()
         Instance.new("UICorner", winHeader).CornerRadius = UDim.new(0, 14)
 
         local winTitle = Instance.new("TextLabel")
-        winTitle.Size = UDim2.new(1, -70, 1, 0)
+        winTitle.Size = UDim2.new(1, -120, 1, 0)
         winTitle.Position = UDim2.new(0, 12, 0, 0)
         winTitle.BackgroundTransparency = 1
         winTitle.Text = "⚡ ПОЛЁТ МАШИНЫ"
@@ -1941,6 +2022,21 @@ local function OpenFlightWindow()
         winTitle.TextSize = 14
         winTitle.TextXAlignment = Enum.TextXAlignment.Left
         winTitle.Parent = winHeader
+
+        local winRefresh = Instance.new("TextButton")
+        winRefresh.Size = UDim2.new(0, 60, 0, 28)
+        winRefresh.Position = UDim2.new(1, -104, 0, 6)
+        winRefresh.BackgroundColor3 = Theme.Accent
+        winRefresh.Text = "🔄 ОБНОВИТЬ"
+        winRefresh.TextColor3 = Color3.new(1, 1, 1)
+        winRefresh.Font = Enum.Font.GothamSemibold
+        winRefresh.TextSize = 10
+        winRefresh.Parent = winHeader
+        Instance.new("UICorner", winRefresh).CornerRadius = UDim.new(0, 6)
+        winRefresh.MouseButton1Click:Connect(function()
+            refreshFlightCars()
+            Notify("Список обновлён", Theme.Green)
+        end)
 
         local winClose = Instance.new("TextButton")
         winClose.Size = UDim2.new(0, 32, 0, 32)
@@ -1999,6 +2095,7 @@ local function OpenFlightWindow()
         local carLayout = Instance.new("UIListLayout")
         carLayout.Padding = UDim.new(0, 4)
         carLayout.Parent = carList
+        ClampScroll(carList)
 
         local selectedFlightCar = nil
 
@@ -2010,57 +2107,66 @@ local function OpenFlightWindow()
             for _, obj in ipairs(Workspace:GetDescendants()) do
                 if obj:IsA("Model") and not Players:GetPlayerFromCharacter(obj) then
                     local n = obj.Name:lower()
+                    local nameHit = n:match("car") or n:match("van") or n:match("bus") or n:match("buggy") or n:match("moped") or n:match("lada") or n:match("sedan") or n:match("maincar") or n:match("truck") or n:match("motor")
                     local hasSteering = obj:FindFirstChild("SteeringWheel", true) or obj:FindFirstChild("Steering", true)
-                    local hasWheels = obj:FindFirstChild("Wheels") or obj:FindFirstChild("wheels")
-                    local nameHit = n:match("car") or n:match("van") or n:match("bus") or n:match("buggy") or n:match("moped") or n:match("lada") or n:match("sedan") or n:match("maincar")
-                    if (nameHit or hasSteering or hasWheels) and (obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")) then
-                        local btn = Instance.new("TextButton")
-                        btn.Size = UDim2.new(1, 0, 0, 28)
-                        btn.BackgroundColor3 = Theme.ElementBg
-                        btn.Text = obj.Name
-                        btn.TextColor3 = Theme.Text
-                        btn.Font = Enum.Font.Gotham
-                        btn.TextSize = 11
-                        btn.TextXAlignment = Enum.TextXAlignment.Left
-                        btn.Parent = carList
-                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-                        btn.MouseButton1Click:Connect(function()
-                            selectedFlightCar = obj
-                            windowFlightState.selectedCar = obj
-                            carHeader.Text = "🚗 Выбрана: " .. obj.Name
-                            carHeader.TextColor3 = Theme.Gold
-                            for _, c in ipairs(carList:GetChildren()) do
-                                if c:IsA("TextButton") then
-                                    local isSel = (c.Text == obj.Name)
-                                    c.BackgroundColor3 = isSel and Theme.Accent or Theme.ElementBg
-                                    c.TextColor3 = isSel and Color3.new(1, 1, 1) or Theme.Text
+                    -- Любая деталь-колесо/шина в модели
+                    local hasWheelPart = false
+                    for _, part in ipairs(obj:GetDescendants()) do
+                        local pn = part.Name:lower()
+                        if part:IsA("BasePart") and (pn:match("wheel") or pn:match("tire") or pn:match("rim")) then
+                            hasWheelPart = true
+                            break
+                        end
+                    end
+                    if (nameHit or hasSteering or hasWheelPart) then
+                        local root = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                        if root then
+                            local btn = Instance.new("TextButton")
+                            btn.Size = UDim2.new(1, 0, 0, 28)
+                            btn.BackgroundColor3 = Theme.ElementBg
+                            btn.Text = obj.Name
+                            btn.TextColor3 = Theme.Text
+                            btn.Font = Enum.Font.Gotham
+                            btn.TextSize = 11
+                            btn.TextXAlignment = Enum.TextXAlignment.Left
+                            btn.Parent = carList
+                            Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+                            btn.MouseButton1Click:Connect(function()
+                                if selectedFlightCar then clearCarHighlight(selectedFlightCar) end
+                                selectedFlightCar = obj
+                                windowFlightState.selectedCar = obj
+                                applyCarHighlight(obj)
+                                carHeader.Text = "🚗 Выбрана: " .. obj.Name
+                                carHeader.TextColor3 = Theme.Gold
+                                for _, c in ipairs(carList:GetChildren()) do
+                                    if c:IsA("TextButton") then
+                                        local isSel = (c.Text == obj.Name)
+                                        c.BackgroundColor3 = isSel and Theme.Accent or Theme.ElementBg
+                                        c.TextColor3 = isSel and Color3.new(1, 1, 1) or Theme.Text
+                                    end
                                 end
-                            end
-                        end)
-                        count = count + 1
+                            end)
+                            count = count + 1
+                        end
                     end
                 end
             end
+            carHeader.Text = "🚗 МАШИНЫ (" .. count .. ")"
+            if count == 0 then
+                local empty = Instance.new("TextLabel")
+                empty.Size = UDim2.new(1, 0, 0, 28)
+                empty.BackgroundColor3 = Theme.DeepBg
+                empty.Text = "Машин не найдено — жми ОБНОВИТЬ"
+                empty.TextColor3 = Theme.TextDim
+                empty.Font = Enum.Font.Gotham
+                empty.TextSize = 10
+                empty.Parent = carList
+                Instance.new("UICorner", empty).CornerRadius = UDim.new(0, 6)
+            end
             pcall(function()
                 carList.CanvasSize = UDim2.new(0, 0, 0, carLayout.AbsoluteContentSize.Y)
-                if carLayout.AbsoluteContentSize.Y > carList.AbsoluteSize.Y then
-                    carList.CanvasSize = UDim2.new(0, 0, 0, carLayout.AbsoluteContentSize.Y + 4)
-                end
             end)
-            carHeader.Text = "🚗 МАШИНЫ (" .. count .. ")"
         end
-
-        local refreshBtn = Instance.new("TextButton")
-        refreshBtn.Size = UDim2.new(0.9, 0, 0, 28)
-        refreshBtn.Position = UDim2.new(0.05, 0, 0, 258)
-        refreshBtn.BackgroundColor3 = Theme.Accent
-        refreshBtn.Text = "🔄 Обновить список"
-        refreshBtn.TextColor3 = Color3.new(1, 1, 1)
-        refreshBtn.Font = Enum.Font.GothamSemibold
-        refreshBtn.TextSize = 12
-        refreshBtn.Parent = win
-        Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 6)
-        refreshBtn.MouseButton1Click:Connect(refreshFlightCars)
 
         local flyToggleBtn = Instance.new("TextButton")
         flyToggleBtn.Name = "FlyToggleButton"
