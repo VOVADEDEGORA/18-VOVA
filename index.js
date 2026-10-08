@@ -7,7 +7,7 @@ app.use(express.json());
 const KEYS_DATABASE = {
     "DV-F7HQ-B4LS-C5RT-D1MZ": "Zahar_76",
     "tester-M6KL-BXKP-EQCH-R9G1": "Beluga_Beluga321",
-    "tester-W7PN-J3QZ-M8RT-K2LV": "Lartime56"
+    "tester-W7PN-J3QZ-M8RT-K2LV": "null"
 };
 
 app.post('/verify', (req, res) => {
