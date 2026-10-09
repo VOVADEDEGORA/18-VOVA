@@ -6,11 +6,12 @@ app.use(express.json());
 // База данных: "Ключ": "Никнейм"
 const KEYS_DATABASE = {
     "KEY-1234-ABCD": "Zahar_76",
-    "MY-SUPER-KEY": "Vovaddegora"
+    "tester-M6KL-BXKP-EQCH-R9G1": "Beluga_Beluga321",
+    "fofer11-W7PN-J3QZ-M8RT-K2LV": "jutegole"
 };
 
 // ⚠️ ВОТ СЮДА ВСТАВЬ ССЫЛКУ НА СВОЙ СКРИПТ (она скрыта от игроков)
-const SECRET_SCRIPT_URL = "https://raw.githubusercontent.com/VOVADEDEGORA/ТВОЙ-РЕПОЗИТОРИЙ/main/script.lua";
+const SECRET_SCRIPT_URL = "https://raw.githubusercontent.com/VOVADEDEGORA/18-VOVA/refs/heads/main/script.lua";
 
 app.post('/verify', (req, res) => {
     const { nickname, key } = req.body;
