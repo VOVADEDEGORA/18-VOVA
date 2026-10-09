@@ -5,30 +5,37 @@ app.use(express.json());
 
 // База данных: "Ключ": "Никнейм"
 const KEYS_DATABASE = {
-    "DV-F7HQ-B4LS-C5RT-D1MZ": "Zahar_76",
-    "tester-M6KL-BXKP-EQCH-R9G1": "Beluga_Beluga321",
-    "fofer11-W7PN-J3QZ-M8RT-K2LV": "jutegole"
+    "KEY-1234-ABCD": "Zahar_76",
+    "MY-SUPER-KEY": "Vovaddegora"
 };
+
+// ⚠️ ВОТ СЮДА ВСТАВЬ ССЫЛКУ НА СВОЙ СКРИПТ (она скрыта от игроков)
+const SECRET_SCRIPT_URL = "https://raw.githubusercontent.com/VOVADEDEGORA/ТВОЙ-РЕПОЗИТОРИЙ/main/script.lua";
 
 app.post('/verify', (req, res) => {
     const { nickname, key } = req.body;
 
+    // Ошибка: ничего не ввели
     if (!nickname || !key) {
-        return res.status(400).json({ detail: "заполните все поля" });
+        return res.status(400).json({ detail: "Key is required" });
     }
 
-    // 1. Если ключа нет в базе
+    // Ошибка: не подходящий ключ
     if (!KEYS_DATABASE[key]) {
-        return res.status(400).json({ detail: "не подходящий ключ" });
+        return res.status(400).json({ detail: "Invalid Key" });
     }
 
-    // 2. Если ключ существует, но привязан к другому нику
+    // Ошибка: ключ не зарегистрирован на ник
     if (KEYS_DATABASE[key].toLowerCase() !== nickname.toLowerCase()) {
-        return res.status(403).json({ detail: "ключ не зарегистрирован  на ник" });
+        return res.status(403).json({ detail: "Key not registered to this user" });
     }
 
-    // Успешный вход
-    return res.status(200).json({ status: "success", message: "Успешный вход" });
+    // Успешный вход -> Отправляем защищенную ссылку
+    return res.status(200).json({ 
+        status: "success", 
+        message: "Success",
+        script_url: SECRET_SCRIPT_URL 
+    });
 });
 
 const PORT = process.env.PORT || 3000;
