@@ -6,7 +6,7 @@ app.use(express.json());
 // База данных: "Ключ": "Никнейм"
 const KEYS_DATABASE = {
     "KEY-1234-ABCD": "Zahar_76",
-    "tester-M6KL-BXKP-EQCH-R9G1": "Beluga_Beluga321",
+    "tester-M6KL-BXKP-EQCH-R9G1": "Iwantbigburger",
     "fofer11-W7PN-J3QZ-M8RT-K2LV": "jutegole"
 };
 
